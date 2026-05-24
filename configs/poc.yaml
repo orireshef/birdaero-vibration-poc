@@ -12,3 +12,9 @@ training:
 dataset:
   raw_dir: "data/raw/deforming_plate"
   processed_dir: "data/processed/deforming_plate"
+
+physics:
+  bc_node_types: [1, 2, 3]
+  bc_loss_weight: 1.0
+  stress_loss_weight: 0.1
+  smoothness_weight: 0.01

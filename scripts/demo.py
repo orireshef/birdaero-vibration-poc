@@ -17,6 +17,7 @@ from vibration_poc.dataset.preprocess import preprocess_dataset
 from vibration_poc.inference.analyze import compute_fft, displacement_time_series
 from vibration_poc.inference.predict import rollout
 from vibration_poc.model.meshgraphnet import MeshGraphNet
+from vibration_poc.physics import PhysicsConfig
 from vibration_poc.training.trainer import TrainingConfig, train
 from vibration_poc.visualization.deformation import create_deformation_gif
 from vibration_poc.visualization.error_maps import plot_error_map
@@ -99,10 +100,16 @@ def main() -> None:
 
     # 3. Train model
     print("\n=== Step 3: Train model ===")
+    physics_config = PhysicsConfig(
+        bc_loss_weight=1.0,
+        stress_loss_weight=0.1,
+        smoothness_weight=0.01,
+    )
     training_config = TrainingConfig(
         epochs=args.epochs,
         device=args.device,
         log_interval=1,
+        physics=physics_config,
     )
     best_checkpoint = train(training_config, dataset_config)
     print(f"Best checkpoint: {best_checkpoint}")
@@ -135,7 +142,14 @@ def main() -> None:
 
     # 6. Run rollout
     print(f"\n=== Step 5: Rollout ({args.num_steps} steps) ===")
-    results = rollout(model, initial_graph, args.num_steps, norm_stats, device)
+    results = rollout(
+        model,
+        initial_graph,
+        args.num_steps,
+        norm_stats,
+        device,
+        bc_node_types=physics_config.bc_node_types,
+    )
     print(f"Rollout complete: {len(results)} steps")
 
     # 7. Generate visualizations

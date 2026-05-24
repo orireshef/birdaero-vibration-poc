@@ -14,7 +14,10 @@ def main() -> None:
     config_path = Path("configs/poc.yaml")
     with open(config_path) as f:
         raw = yaml.safe_load(f)
-    training_config = TrainingConfig(**raw.get("training", {}))
+    training_dict = raw.get("training", {})
+    if "physics" in raw:
+        training_dict["physics"] = raw["physics"]
+    training_config = TrainingConfig(**training_dict)
     dataset_config = DatasetConfig(**raw.get("dataset", {}))
     best = train(training_config, dataset_config)
     print(f"Best checkpoint: {best}")

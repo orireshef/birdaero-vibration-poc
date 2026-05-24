@@ -42,6 +42,13 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--device", default="cpu", help="Device (cpu or cuda)")
     parser.add_argument("--hidden-dim", type=int, default=64, help="Hidden dim")
     parser.add_argument("--num-layers", type=int, default=8, help="MP layers")
+    parser.add_argument(
+        "--bc-node-types",
+        type=int,
+        nargs="+",
+        default=None,
+        help="Boundary node types to zero during rollout",
+    )
     return parser.parse_args()
 
 
@@ -72,7 +79,10 @@ def main() -> None:
     print(f"Loaded norm stats from {norm_stats_path}")
 
     # Run rollout
-    results = rollout(model, initial_graph, args.num_steps, norm_stats, device)
+    bc_types: list[int] | None = args.bc_node_types
+    results = rollout(
+        model, initial_graph, args.num_steps, norm_stats, device, bc_node_types=bc_types
+    )
     print(f"Rollout complete: {len(results)} steps")
 
     # Save results
