@@ -78,7 +78,7 @@ select = [
     "E", "F", "W", "I", "UP", "B", "C4", "SIM",
     "TCH", "RUF", "PT", "PIE", "PL", "PERF",
 ]
-ignore = ["PLR0913", "PLR2004", "PLC0415", "PLR0912", "PERF402", "TC003", "SIM105"]
+ignore = ["PLR0913", "PLR2004", "PLC0415", "PLR0912", "PERF402", "TC001", "TC003", "SIM105"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["vibration_poc"]
