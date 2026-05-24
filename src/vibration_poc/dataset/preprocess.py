@@ -6,6 +6,7 @@ import json
 from collections.abc import Iterator
 from itertools import combinations
 from pathlib import Path
+from typing import TypeVar
 
 import numpy as np
 import torch
@@ -168,6 +169,20 @@ def normalize_graph(graph: dict[str, Tensor], stats: NormStats) -> dict[str, Ten
 # ---------------------------------------------------------------------------
 
 
+_T = TypeVar("_T")
+
+
+def _safe_iter(it: Iterator[_T]) -> Iterator[_T]:
+    """Yield from iterator, stopping on RuntimeError (corrupt TFRecord)."""
+    while True:
+        try:
+            yield next(it)
+        except StopIteration:
+            return
+        except RuntimeError:
+            return
+
+
 def _squeeze_static(arr: np.ndarray) -> np.ndarray:
     """Remove leading dim=1 from static fields (e.g. [1,N,D] -> [N,D])."""
     if arr.ndim == 3 and arr.shape[0] == 1:
@@ -181,7 +196,11 @@ def _iter_graphs(
     meta: dict[str, dict[str, str | list[int]]],
 ) -> Iterator[dict[str, Tensor]]:
     """Yield graph dicts from a TFRecord file, one per frame pair."""
-    for traj in parse_tfrecord(tfrecord_path, meta):
+    try:
+        traj_iter = iter(parse_tfrecord(tfrecord_path, meta))
+    except RuntimeError:
+        return
+    for traj in _safe_iter(traj_iter):
         world_pos: np.ndarray = traj["world_pos"]
         stress: np.ndarray = traj["stress"]
         mesh_pos = _squeeze_static(traj["mesh_pos"])
