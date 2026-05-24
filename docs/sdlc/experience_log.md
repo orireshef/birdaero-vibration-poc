@@ -56,3 +56,22 @@ Lessons learned from development. Check before starting new work.
 - Researcher+architect parallel Reflect is valuable — caught key design insight (edge_attr static, only x[:,:3] changes) that simplified rollout
 - Lead review after agent work is essential — caught 3 lint issues agents missed
 - `matplotlib.use("Agg")` must be set before any pyplot import in both modules and tests
+
+## Phase 5: Physics-Aware Training & Inference (2026-05-24)
+
+### What Went Well
+- Full SDLC cycle with plan mode: user reviewed plan before implementation
+- 5 sequential agents (A→E), each committed per-task — 7 commits for 7 tasks
+- Backward compatibility preserved perfectly: all physics features default to off, 125 tests pass including all 104 originals
+- Clean separation: `physics.py` as standalone module avoids scattering constraint logic across trainer/predict
+- `forward_with_stress()` method keeps `forward()` unchanged — zero risk to existing code
+- Notebook comparison section makes physics constraints tangible for Bird Aero audience
+
+### What Went Wrong
+- Nothing major — plan mode caught design issues upfront
+
+### Lessons Learned
+- Plan mode for architecture changes pays off — backward compatibility and API design decisions benefit from upfront review
+- Opt-in physics via config weights (default=0) is clean pattern: `PhysicsConfig()` = pure data-driven, nonzero weights = physics-aware
+- `forward_with_stress` as separate method (not changing `forward` return type) avoids breaking every downstream caller
+- User education matters: explaining PDE residuals in plain language helped align on the right level of physics for a POC
