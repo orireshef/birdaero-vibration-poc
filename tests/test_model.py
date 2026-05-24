@@ -2,22 +2,8 @@
 
 from __future__ import annotations
 
-import pytest
 import torch
 from torch import Tensor
-
-
-@pytest.fixture
-def tiny_graph() -> dict[str, Tensor]:
-    N, E = 4, 12
-    return {
-        "x": torch.randn(N, 4),
-        "edge_index": torch.randint(0, N, (2, E)),
-        "edge_attr": torch.randn(E, 4),
-        "y": torch.randn(N, 3),
-        "target_stress": torch.randn(N, 1),
-        "mesh_pos": torch.randn(N, 3),
-    }
 
 
 def test_mlp_output_shape() -> None:
