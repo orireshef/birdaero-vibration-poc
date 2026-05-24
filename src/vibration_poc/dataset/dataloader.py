@@ -26,6 +26,11 @@ class GraphDataset(Dataset[dict[str, Tensor]]):
         return torch.load(self._files[idx], weights_only=True)  # type: ignore[no-any-return]
 
 
+def _graph_collate(batch: list[dict[str, Tensor]]) -> dict[str, Tensor]:
+    """Collate for single-graph batches — returns the graph dict without added batch dim."""
+    return batch[0]
+
+
 def get_dataloaders(
     config: DatasetConfig,
     batch_size: int = 1,
@@ -40,5 +45,6 @@ def get_dataloaders(
             batch_size=batch_size,
             num_workers=num_workers,
             shuffle=(split == "train"),
+            collate_fn=_graph_collate,
         )
     return loaders

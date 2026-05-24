@@ -140,9 +140,8 @@ class TestGetDataloaders:
         _make_split_cache(tmp_path, "train", n=3)
         loaders = get_dataloaders(cfg, batch_size=1)
         batch = next(iter(loaders["train"]))
-        # batch_size=1: x should be [1, N, 4] or [N, 4] depending on collate
-        # default collate stacks → [1, 4, 4]
-        assert batch["x"].shape[0] == 1
+        # Custom collate returns raw graph without batch dim
+        assert batch["x"].ndim == 2
 
     def test_all_splits_covered(self, tmp_path: Path) -> None:
         from vibration_poc.dataset.config import DatasetConfig
