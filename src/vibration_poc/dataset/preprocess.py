@@ -19,9 +19,12 @@ from vibration_poc.dataset.config import DatasetConfig, NormStats
 
 
 def load_meta(meta_path: Path) -> dict[str, dict[str, str | list[int]]]:
-    """Load meta.json schema."""
+    """Load meta.json schema — returns the features dict."""
     with open(meta_path) as f:
-        return json.load(f)  # type: ignore[no-any-return]
+        raw: dict[str, object] = json.load(f)
+    if "features" in raw:
+        return raw["features"]  # type: ignore[return-value]
+    return raw  # type: ignore[return-value]
 
 
 def parse_tfrecord(
@@ -189,9 +192,20 @@ def preprocess_split(
     for traj in parse_tfrecord(tfrecord_path, meta):
         world_pos: np.ndarray = traj["world_pos"]  # [T, N, 3]
         stress: np.ndarray = traj["stress"]  # [T, N, 1]
-        mesh_pos: np.ndarray = traj["mesh_pos"]
-        node_type: np.ndarray = traj["node_type"]
-        cells: np.ndarray = traj["cells"]
+        mesh_pos_raw: np.ndarray = traj["mesh_pos"]
+        node_type_raw: np.ndarray = traj["node_type"]
+        cells_raw: np.ndarray = traj["cells"]
+        mesh_pos = (
+            mesh_pos_raw[0]
+            if mesh_pos_raw.ndim == 3 and mesh_pos_raw.shape[0] == 1
+            else mesh_pos_raw
+        )
+        node_type = (
+            node_type_raw[0]
+            if node_type_raw.ndim == 3 and node_type_raw.shape[0] == 1
+            else node_type_raw
+        )
+        cells = cells_raw[0] if cells_raw.ndim == 3 and cells_raw.shape[0] == 1 else cells_raw
 
         T = world_pos.shape[0]
         for t in range(T - 1):
