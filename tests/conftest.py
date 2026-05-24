@@ -41,3 +41,19 @@ def tiny_trajectory(tiny_graph: dict[str, Tensor]) -> list[dict[str, Tensor]]:
         steps.append(g)
         world_pos = new_world_pos
     return steps
+
+
+@pytest.fixture
+def tiny_graph_with_bc() -> dict[str, Tensor]:
+    """Graph with boundary conditions: nodes 0,1 interior (type=0), nodes 2,3 boundary (type=1)."""
+    N, E = 4, 12
+    node_type = torch.tensor([[0.0], [0.0], [1.0], [1.0]])
+    world_pos = torch.randn(N, 3)
+    return {
+        "x": torch.cat([world_pos, node_type], dim=1),
+        "edge_index": torch.randint(0, N, (2, E)),
+        "edge_attr": torch.randn(E, 4),
+        "y": torch.randn(N, 3),
+        "target_stress": torch.randn(N, 1),
+        "mesh_pos": torch.randn(N, 3),
+    }
