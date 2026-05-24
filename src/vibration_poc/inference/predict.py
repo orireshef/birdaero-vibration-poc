@@ -7,6 +7,7 @@ from torch import Tensor
 
 from vibration_poc.dataset.config import NormStats
 from vibration_poc.model.meshgraphnet import MeshGraphNet
+from vibration_poc.physics import get_boundary_mask
 
 
 def rollout(
@@ -15,6 +16,7 @@ def rollout(
     num_steps: int,
     norm_stats: NormStats,
     device: torch.device | None = None,
+    bc_node_types: list[int] | None = None,
 ) -> list[dict[str, Tensor]]:
     """Run autoregressive rollout for num_steps.
 
@@ -33,6 +35,7 @@ def rollout(
     # Initial state
     world_pos = initial_graph["x"][:, :3].to(device)
     node_type = initial_graph["x"][:, 3:].to(device)
+    raw_node_type = initial_graph["x"][:, 3].to(device)
 
     # Normalization tensors
     node_mean = torch.tensor(norm_stats.node_mean, dtype=torch.float32, device=device)
@@ -57,6 +60,11 @@ def rollout(
             }
 
             predicted_displacement: Tensor = model(graph)
+
+            if bc_node_types is not None:
+                bc_mask = get_boundary_mask(raw_node_type, bc_node_types)
+                predicted_displacement = predicted_displacement.clone()
+                predicted_displacement[bc_mask] = 0.0
 
             results.append(
                 {

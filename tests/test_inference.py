@@ -113,6 +113,34 @@ class TestRollout:
         results = rollout(tiny_model, tiny_graph, num_steps=1, norm_stats=norm_stats, device=device)
         assert results[0]["world_pos"].device == device
 
+    def test_rollout_bc_enforcement(
+        self,
+        tiny_model: MeshGraphNet,
+        tiny_graph_with_bc: dict[str, Tensor],
+        norm_stats: NormStats,
+    ) -> None:
+        """Boundary nodes (type=1) should have zero displacement when bc_node_types=[1]."""
+        from vibration_poc.inference.predict import rollout
+
+        results = rollout(
+            tiny_model, tiny_graph_with_bc, num_steps=3, norm_stats=norm_stats, bc_node_types=[1]
+        )
+        for step in results:
+            bc_disp = step["predicted_displacement"][2:]
+            assert torch.allclose(bc_disp, torch.zeros_like(bc_disp))
+
+    def test_rollout_bc_none_no_enforcement(
+        self,
+        tiny_model: MeshGraphNet,
+        tiny_graph_with_bc: dict[str, Tensor],
+        norm_stats: NormStats,
+    ) -> None:
+        """Without bc_node_types, no clamping happens."""
+        from vibration_poc.inference.predict import rollout
+
+        results = rollout(tiny_model, tiny_graph_with_bc, num_steps=1, norm_stats=norm_stats)
+        assert len(results) == 1
+
 
 # ── T19: FFT analysis tests ─────────────────────────────────────────
 
