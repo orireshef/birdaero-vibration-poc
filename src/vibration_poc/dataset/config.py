@@ -14,6 +14,7 @@ class DatasetConfig(BaseModel):
     splits: list[str] = ["train", "valid", "test"]
     num_train_samples: int = Field(default=1000, gt=0)
     num_steps: int = Field(default=400, gt=0)
+    max_trajectories: int | None = None
 
 
 class NormStats(BaseModel):

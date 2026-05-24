@@ -194,29 +194,47 @@ def _squeeze_static(arr: np.ndarray) -> np.ndarray:
 def _iter_graphs(
     tfrecord_path: Path,
     meta: dict[str, dict[str, str | list[int]]],
+    max_trajectories: int | None = None,
 ) -> Iterator[dict[str, Tensor]]:
-    """Yield graph dicts from a TFRecord file, one per frame pair."""
+    """Yield graph dicts from a TFRecord file, one per frame pair.
+
+    Computes edge topology once per trajectory (mesh is static across frames).
+    """
     try:
         traj_iter = iter(parse_tfrecord(tfrecord_path, meta))
     except RuntimeError:
         return
-    for traj in _safe_iter(traj_iter):
+    for traj_count, traj in enumerate(_safe_iter(traj_iter)):
+        if max_trajectories is not None and traj_count >= max_trajectories:
+            return
         world_pos: np.ndarray = traj["world_pos"]
         stress: np.ndarray = traj["stress"]
         mesh_pos = _squeeze_static(traj["mesh_pos"])
         node_type = _squeeze_static(traj["node_type"])
         cells = _squeeze_static(traj["cells"])
 
+        # Compute static topology once per trajectory
+        t_mesh_pos = torch.from_numpy(mesh_pos.astype(np.float32))
+        t_node_type = torch.from_numpy(node_type.astype(np.float32))
+        edge_index = cells_to_edges(cells.astype(np.int64))
+        src, dst = edge_index[0], edge_index[1]
+        rel_pos = t_mesh_pos[dst] - t_mesh_pos[src]
+        norm = rel_pos.norm(dim=1, keepdim=True)
+        edge_attr = torch.cat([rel_pos, norm], dim=1)
+
         t_len = world_pos.shape[0]
         for t in range(t_len - 1):
-            yield build_graph(
-                mesh_pos=mesh_pos,
-                node_type=node_type,
-                cells=cells,
-                world_pos=world_pos[t],
-                target_world_pos=world_pos[t + 1],
-                target_stress=stress[t + 1],
-            )
+            t_world_pos = torch.from_numpy(world_pos[t].astype(np.float32))
+            t_target_wp = torch.from_numpy(world_pos[t + 1].astype(np.float32))
+            t_stress = torch.from_numpy(stress[t + 1].astype(np.float32))
+            yield {
+                "x": torch.cat([t_world_pos, t_node_type], dim=1),
+                "edge_index": edge_index,
+                "edge_attr": edge_attr,
+                "y": t_target_wp - t_world_pos,
+                "target_stress": t_stress,
+                "mesh_pos": t_mesh_pos,
+            }
 
 
 def _compute_streaming_stats(graph_dir: Path) -> NormStats:
@@ -273,7 +291,7 @@ def preprocess_split(
 
     # Pass 1: save graphs to disk (normalized if stats known, raw if not)
     idx = 0
-    for graph in _iter_graphs(tfrecord_path, meta):
+    for graph in _iter_graphs(tfrecord_path, meta, max_trajectories=config.max_trajectories):
         saved = normalize_graph(graph, stats) if stats is not None else graph
         torch.save(saved, out_dir / f"{idx:06d}.pt")
         idx += 1
