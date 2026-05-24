@@ -1,0 +1,50 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[codz]
+*$py.class
+
+# C extensions
+*.so
+
+# Distribution / packaging
+build/
+dist/
+*.egg-info/
+*.egg
+
+# Unit test / coverage reports
+htmlcov/
+.coverage
+.coverage.*
+.pytest_cache/
+.hypothesis/
+
+# Environments
+.env
+.envrc
+.venv
+venv/
+
+# mypy
+.mypy_cache/
+
+# ruff
+.ruff_cache/
+
+# Jupyter
+.ipynb_checkpoints
+
+# Project data (downloaded separately)
+/data/
+/raw_dataset/
+
+# Training outputs
+/outputs/
+/checkpoints/
+
+# Claude Code transient state
+.claude/scheduled_tasks.lock
+.claude/worktrees/
+
+# OS
+.DS_Store
