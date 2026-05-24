@@ -107,3 +107,6 @@ markers = [
     "integration: requires dataset download",
     "gpu: requires GPU",
 ]
+
+[tool.coverage.run]
+omit = ["src/vibration_poc/app.py"]
