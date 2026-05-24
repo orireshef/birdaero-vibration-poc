@@ -16,6 +16,7 @@ dependencies = [
     "pydantic>=2.0",
     "pyyaml>=6.0",
     "tqdm>=4.60",
+    "tfrecord>=1.14.6",
 ]
 
 [project.optional-dependencies]
@@ -55,10 +56,12 @@ disallow_untyped_decorators = true
 [[tool.mypy.overrides]]
 module = [
     "torch.*",
+    "torch_geometric.*",
     "h5py.*",
     "scipy.*",
     "matplotlib.*",
     "tqdm.*",
+    "tfrecord.*",
 ]
 ignore_missing_imports = true
 
