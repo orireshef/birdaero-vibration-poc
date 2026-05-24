@@ -60,6 +60,7 @@ module = [
     "h5py.*",
     "scipy.*",
     "matplotlib.*",
+    "mpl_toolkits.*",
     "tqdm.*",
     "tfrecord.*",
 ]
