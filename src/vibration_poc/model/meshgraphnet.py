@@ -78,14 +78,19 @@ class MeshGraphNet(nn.Module):
         output_dim: int = 3,
         hidden_dim: int = 128,
         num_layers: int = 15,
+        predict_stress: bool = False,
     ) -> None:
         super().__init__()
         self.node_encoder = MLP([input_dim_nodes, hidden_dim, hidden_dim])
         self.edge_encoder = MLP([input_dim_edges, hidden_dim, hidden_dim])
         self.processor = nn.ModuleList([ProcessorLayer(hidden_dim) for _ in range(num_layers)])
         self.decoder = MLP([hidden_dim, hidden_dim, output_dim], layer_norm=False)
+        self.stress_decoder: MLP | None = (
+            MLP([hidden_dim, hidden_dim, 1], layer_norm=False) if predict_stress else None
+        )
 
-    def forward(self, graph: dict[str, Tensor]) -> Tensor:
+    def _encode_process(self, graph: dict[str, Tensor]) -> Tensor:
+        """Run encoder + processor, return latent node embeddings."""
         x = graph["x"]
         edge_index = graph["edge_index"]
         edge_attr = graph["edge_attr"]
@@ -97,5 +102,20 @@ class MeshGraphNet(nn.Module):
             assert isinstance(layer, ProcessorLayer)
             x, edge_attr = layer(x, edge_index, edge_attr)
 
+        result: Tensor = x
+        return result
+
+    def forward(self, graph: dict[str, Tensor]) -> Tensor:
+        x = self._encode_process(graph)
         decoded: Tensor = self.decoder(x)
         return decoded
+
+    def forward_with_stress(self, graph: dict[str, Tensor]) -> tuple[Tensor, Tensor]:
+        """Return (displacement [N,3], stress [N,1]). Requires predict_stress=True."""
+        if self.stress_decoder is None:
+            msg = "stress_decoder not initialized — set predict_stress=True"
+            raise RuntimeError(msg)
+        x = self._encode_process(graph)
+        disp: Tensor = self.decoder(x)
+        stress: Tensor = self.stress_decoder(x)
+        return disp, stress
