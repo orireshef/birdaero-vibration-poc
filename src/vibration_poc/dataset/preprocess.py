@@ -35,6 +35,8 @@ def parse_tfrecord(
     for record in loader:
         decoded: dict[str, np.ndarray] = {}
         for key, spec in meta.items():
+            if key not in record:
+                continue
             raw: bytes = record[key]
             dtype = str(spec["dtype"])
             raw_shape = spec["shape"]
