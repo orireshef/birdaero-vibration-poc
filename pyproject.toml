@@ -63,6 +63,7 @@ module = [
     "mpl_toolkits.*",
     "tqdm.*",
     "tfrecord.*",
+    "yaml.*",
 ]
 ignore_missing_imports = true
 
