@@ -1,4 +1,4 @@
-.PHONY: setup lint format typecheck test test-all check clean
+.PHONY: setup lint format typecheck test test-all check demo clean
 
 # First-time setup
 setup:
@@ -27,6 +27,10 @@ test-all:
 
 # Full validation (what pre-commit runs)
 check: lint format typecheck test
+
+# Demo app
+demo:
+	uv run streamlit run src/vibration_poc/app.py
 
 # Clean caches
 clean:
