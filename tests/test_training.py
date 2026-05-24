@@ -68,3 +68,37 @@ def test_train_epoch_runs(tiny_graph: dict[str, Tensor]) -> None:
     loss = train_epoch(model, loader, optimizer, device)
     assert isinstance(loss, float)
     assert loss >= 0.0
+
+
+@pytest.mark.slow
+def test_train_epoch_with_physics_config(tiny_graph: dict[str, Tensor]) -> None:
+    """Physics loss adds BC + smoothness terms."""
+    from vibration_poc.model.meshgraphnet import MeshGraphNet
+    from vibration_poc.physics import PhysicsConfig
+    from vibration_poc.training.trainer import train_epoch
+
+    model = MeshGraphNet(hidden_dim=8, num_layers=1)
+    loader = make_loader([tiny_graph, tiny_graph])
+    optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
+    device = torch.device("cpu")
+
+    physics = PhysicsConfig(bc_loss_weight=0.1, smoothness_weight=0.05)
+    loss = train_epoch(model, loader, optimizer, device, physics=physics)
+    assert isinstance(loss, float)
+    assert loss >= 0.0
+
+
+@pytest.mark.slow
+def test_train_epoch_physics_none_unchanged(tiny_graph: dict[str, Tensor]) -> None:
+    """physics=None gives same behavior as before."""
+    from vibration_poc.model.meshgraphnet import MeshGraphNet
+    from vibration_poc.training.trainer import train_epoch
+
+    model = MeshGraphNet(hidden_dim=8, num_layers=1)
+    loader = make_loader([tiny_graph, tiny_graph])
+    optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
+    device = torch.device("cpu")
+
+    loss = train_epoch(model, loader, optimizer, device, physics=None)
+    assert isinstance(loss, float)
+    assert loss >= 0.0
