@@ -75,3 +75,21 @@ Lessons learned from development. Check before starting new work.
 - Opt-in physics via config weights (default=0) is clean pattern: `PhysicsConfig()` = pure data-driven, nonzero weights = physics-aware
 - `forward_with_stress` as separate method (not changing `forward` return type) avoids breaking every downstream caller
 - User education matters: explaining PDE residuals in plain language helped align on the right level of physics for a POC
+
+## Phase 6: Demo UI (2026-05-24)
+
+### What Went Well
+- Sequential agent dispatch (4 agents: A→D) worked cleanly — zero file conflicts
+- Separation of `engine.py` (agent-callable API) from `app.py` (Streamlit UI) is clean architecture for future autonomous loop
+- STL mesh loader uses only `struct` — no external dependency needed
+- 151 tests, 96% coverage, mypy strict clean, ruff clean
+- Agents committed per-task (8 commits for 5 tasks)
+
+### What Went Wrong
+- Coverage dropped below 80% when `app.py` (159 lines, 0% covered) was included — Streamlit apps can't be meaningfully unit-tested, needed coverage exclusion
+- Agent D (app) used `Any` type for `mesh_file` parameter — acceptable for Streamlit's UploadedFile type which lacks stubs
+
+### Lessons Learned
+- Streamlit apps should be excluded from coverage measurement (`[tool.coverage.run] omit`) — they're integration-tested manually, not unit-tested
+- Separating evaluation logic from UI (engine.py vs app.py) pays off: engine is fully testable, app is a thin wrapper
+- For POC demos, Streamlit + Plotly is the right choice: 300 lines for a full interactive UI vs 3000+ for React equivalent
