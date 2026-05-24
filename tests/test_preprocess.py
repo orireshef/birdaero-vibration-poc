@@ -436,13 +436,13 @@ class TestPreprocessSplit:
                 return_value={},
             ),
         ):
-            graphs, _ = preprocess_split("train", cfg, stats=None)
+            _, _ = preprocess_split("train", cfg, stats=None)
 
         pt_dir = cfg.processed_dir / "train"
         assert pt_dir.exists()
         pt_files = list(pt_dir.glob("*.pt"))
         # 2 timesteps → 1 frame pair (t=0→1)
-        assert len(pt_files) == len(graphs)
+        assert len(pt_files) == 1
 
     def test_returns_graphs_list(self, tmp_path: Path) -> None:
         from vibration_poc.dataset.config import DatasetConfig
@@ -470,7 +470,9 @@ class TestPreprocessSplit:
             graphs, _stats = preprocess_split("train", cfg, stats=None)
 
         assert isinstance(graphs, list)
-        assert len(graphs) == 1  # 2 frames → 1 pair
+        # Streaming mode returns empty list; graphs are on disk
+        pt_files = list((cfg.processed_dir / "train").glob("*.pt"))
+        assert len(pt_files) == 1  # 2 frames → 1 pair
 
     def test_computes_stats_for_train(self, tmp_path: Path) -> None:
         from vibration_poc.dataset.config import DatasetConfig, NormStats

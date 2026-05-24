@@ -168,6 +168,69 @@ def normalize_graph(graph: dict[str, Tensor], stats: NormStats) -> dict[str, Ten
 # ---------------------------------------------------------------------------
 
 
+def _squeeze_static(arr: np.ndarray) -> np.ndarray:
+    """Remove leading dim=1 from static fields (e.g. [1,N,D] -> [N,D])."""
+    if arr.ndim == 3 and arr.shape[0] == 1:
+        result: np.ndarray = arr[0]
+        return result
+    return arr
+
+
+def _iter_graphs(
+    tfrecord_path: Path,
+    meta: dict[str, dict[str, str | list[int]]],
+) -> Iterator[dict[str, Tensor]]:
+    """Yield graph dicts from a TFRecord file, one per frame pair."""
+    for traj in parse_tfrecord(tfrecord_path, meta):
+        world_pos: np.ndarray = traj["world_pos"]
+        stress: np.ndarray = traj["stress"]
+        mesh_pos = _squeeze_static(traj["mesh_pos"])
+        node_type = _squeeze_static(traj["node_type"])
+        cells = _squeeze_static(traj["cells"])
+
+        t_len = world_pos.shape[0]
+        for t in range(t_len - 1):
+            yield build_graph(
+                mesh_pos=mesh_pos,
+                node_type=node_type,
+                cells=cells,
+                world_pos=world_pos[t],
+                target_world_pos=world_pos[t + 1],
+                target_stress=stress[t + 1],
+            )
+
+
+def _compute_streaming_stats(graph_dir: Path) -> NormStats:
+    """Compute norm stats from saved .pt files using streaming sums."""
+    files = sorted(graph_dir.glob("*.pt"))
+    x_sum = torch.zeros(4, dtype=torch.float64)
+    x_sq_sum = torch.zeros(4, dtype=torch.float64)
+    e_sum = torch.zeros(4, dtype=torch.float64)
+    e_sq_sum = torch.zeros(4, dtype=torch.float64)
+    n_nodes = 0
+    n_edges = 0
+    for f in files:
+        g: dict[str, Tensor] = torch.load(f, weights_only=True)
+        x = g["x"].double()
+        e = g["edge_attr"].double()
+        x_sum += x.sum(dim=0)
+        x_sq_sum += (x**2).sum(dim=0)
+        e_sum += e.sum(dim=0)
+        e_sq_sum += (e**2).sum(dim=0)
+        n_nodes += x.shape[0]
+        n_edges += e.shape[0]
+    x_mean = x_sum / n_nodes
+    x_std = torch.clamp(torch.sqrt(x_sq_sum / n_nodes - x_mean**2), min=1e-8)
+    e_mean = e_sum / n_edges
+    e_std = torch.clamp(torch.sqrt(e_sq_sum / n_edges - e_mean**2), min=1e-8)
+    return NormStats(
+        node_mean=x_mean.float().tolist(),
+        node_std=x_std.float().tolist(),
+        edge_mean=e_mean.float().tolist(),
+        edge_std=e_std.float().tolist(),
+    )
+
+
 def preprocess_split(
     split: str,
     config: DatasetConfig,
@@ -175,9 +238,9 @@ def preprocess_split(
 ) -> tuple[list[dict[str, Tensor]], NormStats | None]:
     """Read TFRecord for split, build graphs for consecutive frame pairs.
 
-    For each trajectory: iterate frames 0..T-2, build graph from frame t -> t+1.
-    If stats provided, normalize. If split=="train" and stats is None, compute stats.
-    Cache graphs to config.processed_dir/{split}/ as .pt files.
+    Streams graphs to disk one at a time to avoid OOM on large datasets.
+    For train split without stats: saves raw graphs, computes stats from disk,
+    then normalizes in a second pass.
     """
     out_dir = config.processed_dir / split
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -187,54 +250,26 @@ def preprocess_split(
 
     meta = load_meta(meta_path) if meta_path.exists() else {}
 
-    graphs: list[dict[str, Tensor]] = []
+    need_stats = split == "train" and stats is None
+
+    # Pass 1: save graphs to disk (normalized if stats known, raw if not)
     idx = 0
-    for traj in parse_tfrecord(tfrecord_path, meta):
-        world_pos: np.ndarray = traj["world_pos"]  # [T, N, 3]
-        stress: np.ndarray = traj["stress"]  # [T, N, 1]
-        mesh_pos_raw: np.ndarray = traj["mesh_pos"]
-        node_type_raw: np.ndarray = traj["node_type"]
-        cells_raw: np.ndarray = traj["cells"]
-        mesh_pos = (
-            mesh_pos_raw[0]
-            if mesh_pos_raw.ndim == 3 and mesh_pos_raw.shape[0] == 1
-            else mesh_pos_raw
-        )
-        node_type = (
-            node_type_raw[0]
-            if node_type_raw.ndim == 3 and node_type_raw.shape[0] == 1
-            else node_type_raw
-        )
-        cells = cells_raw[0] if cells_raw.ndim == 3 and cells_raw.shape[0] == 1 else cells_raw
+    for graph in _iter_graphs(tfrecord_path, meta):
+        saved = normalize_graph(graph, stats) if stats is not None else graph
+        torch.save(saved, out_dir / f"{idx:06d}.pt")
+        idx += 1
 
-        T = world_pos.shape[0]
-        for t in range(T - 1):
-            g = build_graph(
-                mesh_pos=mesh_pos,
-                node_type=node_type,
-                cells=cells,
-                world_pos=world_pos[t],
-                target_world_pos=world_pos[t + 1],
-                target_stress=stress[t + 1],
-            )
-            graphs.append(g)
-            idx += 1
-
-    # Compute stats if training and none provided
+    # Compute stats from saved raw graphs, then normalize them in place
     computed_stats: NormStats | None = None
-    if split == "train" and stats is None and graphs:
-        computed_stats = compute_norm_stats(graphs)
-        stats = computed_stats
+    if need_stats and idx > 0:
+        computed_stats = _compute_streaming_stats(out_dir)
+        for f in sorted(out_dir.glob("*.pt")):
+            g = torch.load(f, weights_only=True)
+            g = normalize_graph(g, computed_stats)
+            torch.save(g, f)
 
-    # Normalize if stats available
-    if stats is not None:
-        graphs = [normalize_graph(g, stats) for g in graphs]
-
-    # Cache to disk
-    for i, g in enumerate(graphs):
-        torch.save(g, out_dir / f"{i:06d}.pt")
-
-    return graphs, computed_stats
+    # Return empty list to avoid loading all graphs into memory
+    return [], computed_stats
 
 
 def preprocess_dataset(config: DatasetConfig) -> None:
