@@ -22,3 +22,16 @@ class NormStats(BaseModel):
     node_std: list[float]
     edge_mean: list[float]
     edge_std: list[float]
+
+
+class GridConfig(BaseModel):
+    resolution: tuple[int, int, int] = (32, 64, 16)
+    padding_ratio: float = Field(default=0.05, ge=0)
+    modes: tuple[int, int, int] = (12, 12, 8)
+
+
+class GridNormStats(BaseModel):
+    channel_mean: list[float]
+    channel_std: list[float]
+    target_mean: list[float]
+    target_std: list[float]

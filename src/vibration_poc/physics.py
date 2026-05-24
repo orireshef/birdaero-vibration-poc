@@ -50,3 +50,23 @@ def compute_smoothness_loss(pred: Tensor, edge_index: Tensor) -> Tensor:
     src, dst = edge_index[0], edge_index[1]
     diff = pred[src] - pred[dst]
     return (diff**2).mean()
+
+
+def compute_masked_mse(pred: Tensor, target: Tensor, mask: Tensor) -> Tensor:
+    """Occupancy-masked MSE. pred/target: [B,C,Gx,Gy,Gz], mask: [B,1,Gx,Gy,Gz]."""
+    diff = (pred - target) ** 2 * mask
+    return diff.sum() / (mask.sum() * pred.shape[1] + 1e-8)
+
+
+def compute_grid_smoothness_loss(pred: Tensor, mask: Tensor) -> Tensor:
+    """Finite-difference gradient penalty on grid. pred: [B,C,Gx,Gy,Gz]."""
+    dx = (pred[:, :, 1:, :, :] - pred[:, :, :-1, :, :]) * mask[:, :, 1:, :, :]
+    dy = (pred[:, :, :, 1:, :] - pred[:, :, :, :-1, :]) * mask[:, :, :, 1:, :]
+    dz = (pred[:, :, :, :, 1:] - pred[:, :, :, :, :-1]) * mask[:, :, :, :, 1:]
+    return (dx**2).mean() + (dy**2).mean() + (dz**2).mean()
+
+
+def compute_grid_bc_penalty(pred: Tensor, bc_mask: Tensor) -> Tensor:
+    """Penalize non-zero displacement at boundary grid points."""
+    masked_pred = pred * bc_mask
+    return (masked_pred**2).sum() / (bc_mask.sum() * pred.shape[1] + 1e-8)
