@@ -6,12 +6,14 @@ repos:
         entry: uv run ruff check --fix
         language: system
         types: [python]
+        exclude: ^notebooks/
 
       - id: ruff-format
         name: ruff format
         entry: uv run ruff format
         language: system
         types: [python]
+        exclude: ^notebooks/
 
       - id: mypy
         name: mypy
