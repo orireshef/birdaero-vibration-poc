@@ -88,7 +88,9 @@ class FNO3d(nn.Module):
         self.local_convs = nn.ModuleList(
             [nn.Conv3d(hidden_dim, hidden_dim, kernel_size=1) for _ in range(num_layers)]
         )
-        self.norms = nn.ModuleList([nn.BatchNorm3d(hidden_dim) for _ in range(num_layers)])
+        self.norms = nn.ModuleList(
+            [nn.InstanceNorm3d(hidden_dim, affine=True) for _ in range(num_layers)]
+        )
         self.proj1 = nn.Linear(hidden_dim, hidden_dim * 2)
         self.proj2 = nn.Linear(hidden_dim * 2, output_channels)
 
