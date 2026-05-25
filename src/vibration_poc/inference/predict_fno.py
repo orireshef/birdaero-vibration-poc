@@ -20,6 +20,7 @@ def rollout_fno(
     grid_config: GridConfig,
     device: torch.device | None = None,
     bc_node_types: list[int] | None = None,
+    normalize: bool = True,
 ) -> list[dict[str, Tensor]]:
     """Run autoregressive FNO rollout. Returns same format as GNN rollout."""
     if device is None:
@@ -41,8 +42,16 @@ def rollout_fno(
         mesh_to_grid.grid_bounds,
         grid_config.resolution,
     )
-    ch_mean = np.array(grid_norm_stats.channel_mean, dtype=np.float32).reshape(-1, 1, 1, 1)
-    ch_std = np.array(grid_norm_stats.channel_std, dtype=np.float32).reshape(-1, 1, 1, 1)
+
+    ch_mean: np.ndarray | None = None
+    ch_std: np.ndarray | None = None
+    tgt_mean: np.ndarray | None = None
+    tgt_std: np.ndarray | None = None
+    if normalize:
+        ch_mean = np.array(grid_norm_stats.channel_mean, dtype=np.float32).reshape(-1, 1, 1, 1)
+        ch_std = np.array(grid_norm_stats.channel_std, dtype=np.float32).reshape(-1, 1, 1, 1)
+        tgt_mean = np.array(grid_norm_stats.target_mean, dtype=np.float32).reshape(-1, 1, 1, 1)
+        tgt_std = np.array(grid_norm_stats.target_std, dtype=np.float32).reshape(-1, 1, 1, 1)
 
     results: list[dict[str, Tensor]] = []
 
@@ -51,16 +60,16 @@ def rollout_fno(
             input_fields = np.concatenate([world_pos, mesh_pos, node_type], axis=1)
             grid_input = mesh_to_grid.interpolate(input_fields)
 
-            grid_input_norm = (grid_input - ch_mean) / ch_std
-            grid_input_t = torch.from_numpy(grid_input_norm).unsqueeze(0).to(device)
+            if normalize and ch_mean is not None and ch_std is not None:
+                grid_input = (grid_input - ch_mean) / ch_std
 
+            grid_input_t = torch.from_numpy(grid_input).unsqueeze(0).to(device)
             grid_pred = model(grid_input_t).squeeze(0).cpu().numpy()
 
-            tgt_mean = np.array(grid_norm_stats.target_mean, dtype=np.float32).reshape(-1, 1, 1, 1)
-            tgt_std = np.array(grid_norm_stats.target_std, dtype=np.float32).reshape(-1, 1, 1, 1)
-            grid_pred_denorm = grid_pred * tgt_std + tgt_mean
+            if normalize and tgt_std is not None and tgt_mean is not None:
+                grid_pred = grid_pred * tgt_std + tgt_mean
 
-            displacement = grid_to_mesh.interpolate(grid_pred_denorm, mesh_pos)
+            displacement = grid_to_mesh.interpolate(grid_pred, mesh_pos)
             disp_tensor = torch.from_numpy(displacement).to(device)
 
             if bc_node_types is not None:

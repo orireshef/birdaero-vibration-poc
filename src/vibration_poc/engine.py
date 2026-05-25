@@ -76,6 +76,7 @@ def evaluate_design(
     bc_node_types: list[int] | None = None,
     dt: float = 1.0,
     grid_config: GridConfig | None = None,
+    normalize: bool = True,
 ) -> tuple[DesignMetrics, list[dict[str, Tensor]]]:
     """Run rollout + FFT analysis. Returns (metrics, raw_rollout_results)."""
     if isinstance(model, FNO3d):
@@ -91,6 +92,7 @@ def evaluate_design(
             grid_norm_stats=norm_stats,
             grid_config=grid_config,
             bc_node_types=bc_node_types,
+            normalize=normalize,
         )
     else:
         if not isinstance(norm_stats, NormStats):
