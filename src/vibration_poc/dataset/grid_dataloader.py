@@ -10,6 +10,16 @@ from torch.utils.data import DataLoader, Dataset
 
 from vibration_poc.dataset.config import DatasetConfig, GridConfig
 
+_GRID_KEYS = ("grid_input", "grid_target", "occupancy_mask", "grid_bounds")
+
+
+def _grid_collate(batch: list[dict[str, Tensor]]) -> dict[str, Tensor]:
+    """Collate that only stacks fixed-size grid tensors."""
+    result: dict[str, Tensor] = {}
+    for key in _GRID_KEYS:
+        result[key] = torch.stack([b[key] for b in batch])
+    return result
+
 
 class GridDataset(Dataset[dict[str, Tensor]]):
     """Loads cached grid .pt files from disk."""
@@ -42,5 +52,6 @@ def get_grid_dataloaders(
             batch_size=batch_size,
             num_workers=num_workers,
             shuffle=(split == "train"),
+            collate_fn=_grid_collate,
         )
     return loaders
